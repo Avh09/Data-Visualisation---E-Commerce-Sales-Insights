@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Distribution by Gender and Product Category</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e5e5e5;
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 16px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            height: 100vh;
+            overflow-y: auto;
+            margin: 0 auto;
+            max-width: 1800px;
+        }
+
+        h2 {
+            text-align: center;
+            color: #fff;
+            font-size: 24px;
+            margin-bottom: 30px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .bar {
+            opacity: 0.8;
+            transition: all 0.3s ease;
+            rx: 0; /* Pointed edges */
+            ry: 0; /* Pointed edges */
+        }
+
+        .bar:hover {
+            opacity: 1;
+            transform: scale(1.01);
+            filter: brightness(1.2);
+        }
+
+        .axis path,
+        .axis line {
+            stroke: rgba(255, 255, 255, 0.2);
+        }
+
+        .axis text {
+            fill: rgba(255, 255, 255, 0.9);
+            font-size: 14px;
+        }
+
+        .y-axis text {
+            font-size: 14px;
+            fill: rgba(255, 255, 255, 0.9);
+        }
+
+        .x-axis text {
+            font-size: 14px;
+            fill: rgba(255, 255, 255, 0.9);
+        }
+        .x-axis-label, .y-axis-label {
+            font-size: 16px; /* Increased font size for axis labels */
+            fill: rgba(255, 255, 255, 0.9);
+        }
+        .legend {
+            font-size: 12px;
+            fill: rgba(255, 255, 255, 0.9);
+        }
+
+        .tooltip {
+            position: absolute;
+            padding: 10px 15px;
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            border-radius: 8px;
+            font-size: 14px;
+            pointer-events: none;
+            transform: translate(-50%, -100%);
+            transition: all 0.2s ease;
+            z-index: 100;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            visibility: hidden;
+        }
+
+        .note {
+            color: rgba(255, 255, 255, 0.7);
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .title {
+            color: #fff;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 28px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        .back-button {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button class="back-button" onclick="goBack()">Back to Home</button>
+
+        <h1 class="title">Sales Distribution by Gender, Product Category and Payment Methods</h1>
+        <div id="chart" class="chart-container"></div>
+        <p class="note">* Female sales shown on left (negative) side, Male sales on right (positive) side</p>
+        <!-- <div style="display: flex; justify-content: center; margin-top: 20px;">
+            <button id="backButton" style="padding: 12px 30px; font-size: 12px; cursor: pointer; 
+                background-color: rgba(255, 255, 255, 0.1); 
+                color: white; 
+                border: none; 
+                border-radius: 50px; /* Capsule shape */
+                box-shadow: 0 4px 10px rgba(0, 0, 255, 0.5); /* Blue shadow */
+                transition: background-color 0.3s, transform 0.2s;">
+                < Back
+            </button>
+        </div> -->
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script>
+        function goBack() {
+            window.location.href = 'index.html';
+        }
+
+        // Set the dimensions and margins
+        const margin = { top: 40, right: 200, bottom: 100, left: 200 };
+        const width = 1800 - margin.left - margin.right;
+        const height = 700 - margin.top - margin.bottom;
+    
+        // Create SVG container
+        const svg = d3.select("#chart")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top+20})`);
+    
+        // Create Tooltip
+        const tooltip = d3.select("body")
+            .append("div")
+            .attr("class", "tooltip");
+    
+        async function createChart() {
+            try {
+                const data = await d3.csv('data.csv');
+                const filteredData = data.filter(d => d.Product_Category && d.Product_Category !== "not defined");
+
+                const groupedData = d3.rollup(
+                    filteredData,
+                    v => d3.sum(v, d => +d.Sales || 0),
+                    d => d.Product_Category,
+                    d => d.Gender,
+                    d => d.Payment_method
+                );
+
+                const processedData = Array.from(groupedData, ([category, genderMap]) => ({
+                category,
+                values: ['Male', 'Female'].map(gender => {
+                    const paymentMap = genderMap.get(gender) || new Map();
+                    return {
+                        gender,
+                        total: d3.sum(Array.from(paymentMap.values())),
+                        payments: Array.from(paymentMap, ([method, value]) => ({ method, value }))
+                    };
+                })
+            }));
+
+                // Determine the order of payment methods based on the first category
+                const paymentOrder = Array.from(new Set(processedData[0].values[0].payments.map(p => p.method)));
+
+                processedData.forEach(d => {
+                    d.values.forEach(v => {
+                        v.payments.sort((a, b) => paymentOrder.indexOf(a.method) - paymentOrder.indexOf(b.method));
+                    });
+                });
+
+                processedData.sort((a, b) => {
+                    const totalA = d3.sum(a.values, d => d.total);
+                    const totalB = d3.sum(b.values, d => d.total);
+                    return totalB - totalA;
+                });
+
+                const xScale = d3.scaleLinear()
+                    .domain([
+                        d3.min(processedData, d => -d.values[1].total) * 1.2,
+                        d3.max(processedData, d => d.values[0].total) * 1.2
+                    ])
+                    .range([0, width])
+                    .nice();
+
+                const yScale = d3.scaleBand()
+                    .domain(processedData.map(d => d.category))
+                    .range([0, height])
+                    .padding(0.3);
+
+                // Add Y axis
+                svg.append("g")
+                    .attr("class", "y-axis")
+                    .call(d3.axisLeft(yScale))
+                    .selectAll("text")
+                    .style("text-anchor", "end")
+                    .attr("dx", "-.5em")
+                    .attr("dy", ".35em")
+                    .attr("transform", "translate(0, 10)"); // Move the labels down by 10 pixels
+
+                // Add X axis
+                svg.append("g")
+                    .attr("class", "x-axis")
+                    .attr("transform", `translate(0,${height+20})`)
+                    .call(d3.axisBottom(xScale).tickFormat(d => Math.abs(d))) // Use absolute value for ticks
+                    .selectAll("text")
+                    .style("text-anchor", "middle")
+                    .attr("dy", "1em");
+
+                const colorScale = d3.scaleOrdinal(["#ff4d4d", "#4d94ff", "#47d147", "#bf80ff", "#ffd700"]);
+
+                processedData.forEach(d => {
+                    let maleStackStart = 0;
+                    let femaleStackStart = 0;
+
+                    d.values[0].payments.forEach(p => {
+                        svg.append("rect")
+                            .attr("class", "bar")
+                            .attr("y", yScale(d.category))
+                            .attr("x", xScale(maleStackStart))
+                            .attr("height", yScale.bandwidth())
+                            .attr("width", Math.abs(xScale(p.value) - xScale(0)))
+                            .attr("fill", colorScale(p.method))
+                            .attr("rx", 0) // Pointed edges
+                            .attr("ry", 0) // Pointed edges
+                            .on("mouseover", function(event) {
+                                tooltip.style("visibility", "visible")
+                                    .html(`
+                                        <strong>${d.category}</strong><br>
+                                        Gender: Male<br>
+                                        Payment: ${p.method}<br>
+                                        Sales: $${p.value.toLocaleString()}
+                                    `)
+                                    .style("top", (event.pageY - 10) + "px")
+                                    .style("left", (event.pageX + 10) + "px");
+                            })
+                            .on("mouseout", function() {
+                                tooltip.style("visibility", "hidden");
+                            });
+                        maleStackStart += p.value;
+                    });
+
+                    d.values[1].payments.forEach(p => {
+                        svg.append("rect")
+                            .attr("class", "bar")
+                            .attr("y", yScale(d.category))
+                            .attr("x", xScale(femaleStackStart - p.value))
+                            .attr("height", yScale.bandwidth())
+                            .attr("width", Math.abs(xScale(0) - xScale(-p.value)))
+                            .attr("fill", colorScale(p.method))
+                            .attr("rx", 0) // Pointed edges
+                            .attr("ry", 0) // Pointed edges
+                            .on("mouseover", function(event) {
+                                tooltip.style("visibility", "visible")
+                                    .html(`
+                                        <strong>${d.category}</strong><br>
+                                        Gender: Female<br>
+                                        Payment: ${p.method}<br>
+                                        Sales: $${p.value.toLocaleString()}
+                                    `)
+                                    .style("top", (event.pageY - 10) + "px")
+                                    .style("left", (event.pageX + 10) + "px");
+                            })
+                            .on("mouseout", function() {
+                                tooltip.style("visibility", "hidden");
+                            });
+                        femaleStackStart -= p.value;
+                    });
+                });
+
+                // Add center line
+                svg.append("line")
+                    .attr("x1", xScale(0))
+                    .attr("x2", xScale(0))
+                    .attr("y1", 0)
+                    .attr("y2", height)
+                    .attr("stroke", "rgba(255, 255, 255, 0.5)")
+                    .attr("stroke-width", 2);
+
+                // Add axis labels
+                svg.append("text")
+                    .attr("class", "x-axis-label")
+                    .attr("x", width / 2)
+                    .attr("y", height + 60)
+                    .attr("text-anchor", "middle")
+                    .style("fill", "rgba(255, 255, 255, 0.9)")
+                    .text("Sales Amount ($)");
+
+                svg.append("text")
+                    .attr("class", "y-axis-label")
+                    .attr("transform", "rotate(-90)")
+                    .attr("x", -height / 2)
+                    .attr("y", -180)
+                    .attr("text-anchor", "middle")
+                    .style("fill", "rgba(255, 255, 255, 0.9)")
+                    .text("Product Categories");
+                // const xAxis = d3.axisBottom(xScale).ticks(10); // Adjust the number of ticks as needed
+
+                // Add legend
+                const legend = svg.append("g")
+                    .attr("class", "legend")
+                    .attr("transform", `translate(${width + 20}, 20)`);
+
+                const paymentMethods = Array.from(new Set(data.map(d => d.Payment_method)));
+                paymentMethods.forEach((method, i) => {
+                    const legendItem = legend.append("g")
+                        .attr("transform", `translate(0, ${i * 25})`);
+
+                    legendItem.append("rect")
+                        .attr("width", 18)
+                        .attr("height", 18)
+                        .attr("rx", 3)
+                        .attr("ry", 3)
+                        .attr("fill", colorScale(method));
+
+                    legendItem.append("text")
+                        .attr("x", 25)
+                        .attr("y", 14)
+                        .style("fill", "rgba(255, 255, 255, 0.9)")
+                        .text(method);
+                });
+
+            } catch (error) {
+                console.error('Error loading CSV:', error);
+            }
+        }
+        createChart();
+        
+    </script>
+</body>
+</html>

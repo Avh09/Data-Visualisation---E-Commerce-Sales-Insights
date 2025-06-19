@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Commerce Analytics</title>
+    <!-- Font Awesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --card-bg: rgba(16, 20, 35, 0.7);
+            --border-glow: 0 0 15px rgba(88, 101, 242, 0.3);
+            --hover-glow: 0 0 20px rgba(88, 101, 242, 0.5);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            overflow-x: hidden;
+            background: linear-gradient(
+                135deg,
+                #0a1033 0%,
+                #1a1045 25%,
+                #261355 50%,
+                #301666 75%,
+                #3a1977 100%
+            );
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: #fff;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(90deg, #5865F2 0%, #8B5CF6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header p {
+            color: #a8b3cf;
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .cards-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            padding: 0.5rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 12px;
+            padding: 2px;
+            background: linear-gradient(135deg, #5865F2, #8B5CF6);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            opacity: 0.5;
+            transition: opacity 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateX(10px);
+            box-shadow: var(--hover-glow);
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .card:nth-child(1) .card-icon {
+            color: #5865F2;
+        }
+
+        .card:nth-child(2) .card-icon {
+            color: #2ecc71;
+        }
+
+        .card:nth-child(3) .card-icon {
+            color: #9b59b6;
+        }
+
+        .card-content {
+            flex-grow: 1;
+        }
+
+        .card h2 {
+            font-size: 1.5rem;
+            margin: 0 0 0.5rem 0;
+            color: #fff;
+        }
+
+        .card p {
+            color: #a8b3cf;
+            margin: 0 0 1rem 0;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .explore-link {
+            color: #5865F2;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .explore-link:hover {
+            color: #8B5CF6;
+        }
+
+        .explore-link i {
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover .explore-link i {
+            transform: translateX(5px);
+        }
+
+        .vis-page {
+            display: none;
+            opacity: 0;
+            transition: all 0.5s ease;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                135deg,
+                #0a1033 0%,
+                #1a1045 25%,
+                #261355 50%,
+                #301666 75%,
+                #3a1977 100%
+            );
+            padding: 0;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        body.vis-active {
+            overflow: hidden;
+        }
+
+        .vis-page.active {
+            display: block;
+            opacity: 1;
+        }
+
+        .vis-container {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 2rem;
+            position: relative;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .back-button {
+            position: fixed;
+            top: 2rem;
+            left: 2rem;
+            background: none;
+            border: none;
+            color: #5865F2;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1rem;
+            padding: 0.5rem 1rem;
+            transition: color 0.3s ease;
+        }
+
+        .back-button:hover {
+            color: #8B5CF6;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100vh;
+            border: none;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Home Page -->
+        <div id="homePage" class="page active">
+            <header class="header">
+                <h1>E-Commerce Data Insights</h1>
+                <p>Discover valuable insights from our e-commerce data through interactive visualizations</p>
+            </header>
+            
+            <div class="cards-container">
+                <!-- Sales Card -->
+                <div class="card" onclick="changePage('sales')">
+                    <div class="card-icon">
+                        <i class="fas fa-chart-pie"></i>
+                    </div>
+                    <div class="card-content">
+                        <h2>Category Sales Analysis</h2>
+                        <p>Explore sales distribution across categories with detailed profit and cost breakdowns</p>
+                        <div class="explore-link">
+                            Explore
+                            <i class="fas fa-arrow-right"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aging Card -->
+                <div class="card" onclick="changePage('aging')">
+                    <div class="card-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="card-content">
+                        <h2>Order Aging Analysis</h2>
+                        <p>Analyze delivery times across product categories and priority levels</p>
+                        <div class="explore-link">
+                            Explore
+                            <i class="fas fa-arrow-right"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Card -->
+                <div class="card" onclick="changePage('payment')">
+                    <div class="card-icon">
+                        <i class="fas fa-chart-bar"></i>
+                    </div>
+                    <div class="card-content">
+                        <h2>Payment Method Analysis</h2>
+                        <p>Understand sales distribution across gender, product category and payment </p>
+                        <div class="explore-link">
+                            Explore
+                            <i class="fas fa-arrow-right"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Visualization Pages -->
+        <button class="back-button" onclick="changePage('home')">
+            <i class="fas fa-arrow-left"></i>
+            Back to Home
+        </button>
+
+        <!-- Sales Page -->
+        <div id="salesPage" class="vis-page">
+            <iframe src="category.html"></iframe>
+
+        </div>
+
+        <!-- Aging Page -->
+        <div id="agingPage" class="vis-page">
+            <iframe src="aging.html"></iframe>
+        </div>
+
+        <!-- Payment Page -->
+        <div id="paymentPage" class="vis-page">
+            <iframe src="diverging.html"></iframe>
+
+        </div>
+    </div>
+
+    <script>
+        // Simple page navigation
+        let currentPage = 'home';
+
+        function changePage(page) {
+            const pages = ['home', 'sales', 'aging', 'payment'];
+            const backButton = document.querySelector('.back-button');
+            
+            pages.forEach(p => {
+                const element = document.getElementById(p + 'Page');
+                if (p === page) {
+                    element.classList.add('active');
+                    if (page !== 'home') {
+                        document.body.classList.add('vis-active');
+                    }
+                } else {
+                    element.classList.remove('active');
+                }
+            });
+
+            if (page === 'home') {
+                backButton.style.display = 'none';
+                document.body.classList.remove('vis-active');
+            } else {
+                backButton.style.display = 'flex';
+            }
+            
+            currentPage = page;
+        }
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', () => {
+            changePage('home');
+        });
+    </script>
+</body>
+</html>

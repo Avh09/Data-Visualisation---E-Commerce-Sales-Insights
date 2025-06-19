@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sales Distribution Sunburst</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/6.7.0/d3.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #0a0c10;
+            color: #e6e6e6;
+        }
+
+        #chart {
+            width: 932px;
+            height: 932px;
+            margin: auto;
+            padding: 20px;
+            background: linear-gradient(145deg, #0d1117 0%, #161b22 100%);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .title {
+            text-align: center;
+            font-size: 28px;
+            margin: 30px 0;
+            font-weight: 600;
+            background: linear-gradient(90deg, #00ffff, #00ff87);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(0, 255, 255, 0.1);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #161b22;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #30363d;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #484f58;
+        }
+
+        /* SVG specific styles */
+        svg {
+            filter: drop-shadow(0 0 10px rgba(0, 255, 255, 0.1));
+        }
+
+        svg text {
+            fill: #e6e6e6;
+            font-size: 11px;
+            font-weight: 500;
+            transition: font-size 0.3s ease, font-weight 0.3s ease;
+        }
+
+        svg path {
+            transition: all 0.3s ease;
+        }
+
+        /* Enhanced hover effects */
+        .segment {
+            transition: filter 0.3s ease, opacity 0.3s ease;
+        }
+
+        .segment.active {
+            filter: brightness(1.3);
+        }
+
+        .segment.inactive {
+            filter: brightness(0.6);
+            opacity: 0.7;
+        }
+
+        /* Text hover effects */
+        text.active {
+            font-size: 14px !important;
+            font-weight: 600;
+            fill: #ffffff;
+        }
+
+        text.inactive {
+            opacity: 0.7;
+        }
+
+        /* Category colors with increased vibrancy */
+        .category-revenue { fill: #00ff87 !important; }
+        .category-discount { fill: #ff3366 !important; }
+        .category-profit { fill: #00ffff !important; }
+        .category-shipping { fill: #ffcc00 !important; }
+        .back-button {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <button class="back-button" onclick="goBack()">Back to Home</button>
+    <div class="title">Sales Distribution by Product Category</div>
+    <div id="chart"></div>
+    <script>
+        function goBack() {
+            window.location.href = 'index.html';
+        }
+        // Constants
+        const width = 932;
+        const yMax = 3;
+        const radius = width / (2 * yMax);
+        const animationDuration = 750;
+
+        // Utility functions
+        const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+        const clampY = y => clamp(y, 1, yMax);
+        const format = d3.format(",.2f");
+
+        // Process CSV data into hierarchical structure
+        async function processData() {
+            const csvData = await d3.csv("data.csv", d => {
+                const quantity = +d.Quantity;
+                const sales = +d.Sales * quantity;
+                const discountRate = +d.Discount;
+                const discountAmount = sales * discountRate;
+                const profit = +d.Profit * quantity;
+                const shippingCost = +d.Shipping_Cost * quantity;
+                const revenue = sales - (discountAmount + profit + shippingCost);
+                
+                return {
+                    ...d,
+                    Sales: sales,
+                    DiscountAmount: discountAmount,
+                    Profit: profit,
+                    Shipping_Cost: shippingCost,
+                    Revenue: revenue
+                };
+            });
+        
+            const categoryGroups = d3.group(csvData, d => d.Product_Category);
+        
+            const hierarchyData = {
+                name: "Total Sales",
+                children: Array.from(categoryGroups, ([category, items]) => {
+                    const totalSales = d3.sum(items, d => d.Sales);
+                    const totalDiscount = d3.sum(items, d => d.DiscountAmount);
+                    const totalProfit = d3.sum(items, d => d.Profit);
+                    const totalShipping = d3.sum(items, d => d.Shipping_Cost);
+                    const totalRevenue = d3.sum(items, d => d.Revenue);
+                    
+                    return {
+                        name: category,
+                        children: [
+                            { 
+                                name: "Revenue", 
+                                value: totalRevenue,
+                                color: "#2ecc71"
+                            },
+                            { 
+                                name: "Discount", 
+                                value: totalDiscount,
+                                color: "#e74c3c"
+                            },
+                            { 
+                                name: "Profit", 
+                                value: totalProfit,
+                                color: "#3498db"
+                            },
+                            { 
+                                name: "Shipping Cost", 
+                                value: totalShipping,
+                                color: "#f1c40f"
+                            }
+                        ].filter(item => Math.abs(item.value) > 0.01)
+                    };
+                })
+            };
+        
+            return hierarchyData;
+        }
+
+        const getHierarchyPath = (d) => {
+            const path = [];
+            let current = d;
+            while (current.parent) {
+                path.unshift(current.data.name);
+                current = current.parent;
+            }
+            return path.join('/');
+        };
+
+        const partition = data => {
+            const root = d3.hierarchy(data)
+                .sum(d => d.value)
+                .sort((a, b) => b.value - a.value);
+            return d3.partition()
+                .size([2 * Math.PI, root.height + 1])
+                (root);
+        };
+
+        const arc = d3.arc()
+            .startAngle(d => d.x0)
+            .endAngle(d => d.x1)
+            .padAngle(d => Math.min((d.x1 - d.x0) / 2, 0.005))
+            .padRadius(radius * 1.5)
+            .innerRadius(d => clampY(d.y0) * radius)
+            .outerRadius(d => clampY(d.y1) * radius);
+
+        const categoryColor = d3.scaleOrdinal(d3.quantize(d3.interpolateRainbow, 10));
+
+        async function createChart() {
+            const data = await processData();
+            const root = partition(data);
+
+            // Calculate total value at root level
+            root.descendants().forEach(d => {
+                if (!d.parent) {
+                    d.value = d3.sum(d.children, c => d3.sum(c.children, cc => cc.value));
+                } else if (d.children) {
+                    d.value = d3.sum(d.children, c => c.value);
+                }
+            });
+
+            root.each(d => (d.current = d));
+
+            const svg = d3.create("svg")
+                .attr("viewBox", [0, 0, width, width])
+                .style("font-family", "sans-serif")
+                .style("font-size", "10px");
+
+            const g = svg
+                .append("g")
+                .attr("transform", `translate(${width / 2},${width / 2})`);
+
+                const path = g
+                .append("g")
+                .selectAll("path")
+                .data(root.descendants().slice(1))
+                .join("path")
+                .attr("class", "segment")
+                .attr("fill", d => {
+                    if (d.depth === 1) return categoryColor(d.data.name);
+                    return d.data.color || categoryColor(d.parent.data.name);
+                })
+                .attr("fill-opacity", d => arcVisible(d.current) ? (d.children ? 0.6 : 0.8) : 0)
+                .attr("d", d => arc(d.current));
+
+            path.filter(d => d.children)
+                .style("cursor", "pointer")
+                .on("click", clicked);
+
+            path.append("title")
+                .text(d => {
+                    const percentage = d.parent ? (d.value / d.parent.value * 100).toFixed(1) : 100;
+                    return `${getHierarchyPath(d)}\n$${format(d.value)} (${percentage}%)`;
+                });
+
+            const label = g
+                .append("g")
+                .attr("pointer-events", "none")
+                .attr("text-anchor", "middle")
+                .style("user-select", "none")
+                .selectAll("text")
+                .data(root.descendants().slice(1))
+                .join("text")
+                .attr("dy", "0.35em")
+                .attr("fill-opacity", d => +labelVisible(d.current))
+                .attr("transform", d => labelTransform(d.current))
+                .text(d => {
+                    const percentage = d.parent ? (d.value / d.parent.value * 100).toFixed(1) : 100;
+                    return `${d.data.name}\n$${format(d.value)} (${percentage}%)`;
+                });
+
+            // Add hover effects
+            path.on("mouseover", (event, d) => {
+                const segment = d3.select(event.currentTarget);
+                const relatedText = label.filter(t => t === d);
+                
+                // Highlight current segment and its text
+                segment.classed("active", true);
+                relatedText.classed("active", true);
+                
+                // Dim all other segments and text
+                path.filter(p => p !== d).classed("inactive", true);
+                label.filter(t => t !== d).classed("inactive", true);
+            })
+            .on("mouseout", () => {
+                // Reset all effects
+                path.classed("active", false).classed("inactive", false);
+                label.classed("active", false).classed("inactive", false);
+            });
+
+            path.filter(d => d.children)
+                .style("cursor", "pointer")
+                .on("click", clicked);
+
+            const parent = g
+                .append("circle")
+                .datum(root)
+                .attr("r", radius)
+                .attr("fill", "none")
+                .attr("pointer-events", "all")
+                .style("cursor", "pointer")
+                .on("click", clicked);
+
+            function clicked(event, p) {
+                parent.datum(p.parent || root);
+
+                root.each(d => {
+                    d.target = {
+                        x0: Math.max(0, Math.min(2 * Math.PI, (d.x0 - p.x0) / (p.x1 - p.x0) * 2 * Math.PI)),
+                        x1: Math.max(0, Math.min(2 * Math.PI, (d.x1 - p.x0) / (p.x1 - p.x0) * 2 * Math.PI)),
+                        y0: Math.max(0, d.y0 - p.depth),
+                        y1: Math.max(0, d.y1 - p.depth)
+                    };
+                });
+
+                const t = g.transition().duration(animationDuration);
+
+                path.transition(t)
+                    .tween("data", d => {
+                        const i = d3.interpolate(d.current, d.target);
+                        return t => d.current = i(t);
+                    })
+                    .filter(function(d) {
+                        return +this.getAttribute("fill-opacity") || arcVisible(d.target);
+                    })
+                    .attr("fill-opacity", d => arcVisible(d.target) ? (d.children ? 0.6 : 0.8) : 0)
+                    .attrTween("d", d => () => arc(d.current));
+
+                label.transition(t)
+                    .filter(function(d) {
+                        return +this.getAttribute("fill-opacity") || labelVisible(d.target);
+                    })
+                    .attr("fill-opacity", d => +labelVisible(d.target))
+                    .attrTween("transform", d => () => labelTransform(d.current));
+            }
+
+            return svg.node();
+        }
+
+        function arcVisible(d) {
+            return d.y1 <= yMax && d.y0 >= 1 && d.x1 > d.x0;
+        }
+
+        function labelVisible(d) {
+            return d.y1 <= yMax && d.y0 >= 1 && (d.y1 - d.y0) * (d.x1 - d.x0) > 0.03;
+        }
+
+        function labelTransform(d) {
+            const x = (((d.x0 + d.x1) / 2) * 180) / Math.PI;
+            const y = ((clampY(d.y0) + clampY(d.y1)) / 2) * radius;
+            return `rotate(${x - 90}) translate(${y},0) rotate(${x < 180 ? 0 : 180})`;
+        }
+
+        createChart().then(chart => {
+            document.getElementById('chart').appendChild(chart);
+        });
+        
+    </script>
+</body>
+</html>
